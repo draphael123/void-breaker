@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas-bg: #00060f;
+  --neon-cyan: #00d4ff;
+  --border-subtle: #003366;
+}
+
+body {
+  font-family: "Courier New", monospace;
+  background: #00030a;
+}
