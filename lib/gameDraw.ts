@@ -1,6 +1,6 @@
-import type { Player, Enemy, Boss, Bullet, EnemyBullet, Particle, Star, BackStar, Dust, DamageNumber } from "./gameTypes";
+import type { Player, Enemy, Boss, Bullet, Missile, EnemyBullet, Particle, Star, BackStar, Dust, DamageNumber } from "./gameTypes";
 import type { SkillDef } from "./gameTypes";
-import { W, H, SKILLS, LEVELS_CFG, rnd, BULLET_TRAIL_LEN } from "./gameConstants";
+import { W, H, SKILLS, LEVELS_CFG, rnd, clamp, BULLET_TRAIL_LEN, BOSS_SUPER_TELEGRAPH_FRAMES } from "./gameConstants";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -69,6 +69,8 @@ export function drawNebulaPulse(ctx: Ctx, gameLevel: number, frame: number) {
     `rgba(0,30,80,${0.18 * pulse})`,
     `rgba(40,0,80,${0.18 * pulse})`,
     `rgba(80,0,30,${0.18 * pulse})`,
+    `rgba(0,50,40,${0.18 * pulse})`,
+    `rgba(50,40,0,${0.18 * pulse})`,
   ];
   const gg = ctx.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, W * 0.75);
   gg.addColorStop(0, lvlCols[gameLevel] ?? `rgba(0,30,80,${0.1 * pulse})`);
@@ -243,6 +245,14 @@ export function drawEnemy(ctx: Ctx, e: Enemy, _frame: number) {
     ctx.fill();
   }
 
+  if (e.elite && e.eliteVariant) {
+    ctx.fillStyle = "#ffcc00";
+    ctx.font = "bold 8px sans-serif";
+    ctx.textAlign = "center";
+    const label = e.eliteVariant === "fast" ? "F" : e.eliteVariant === "tanky" ? "T" : "M";
+    ctx.fillText(label, 0, -r - 4);
+  }
+
   if (e.hp < e.maxHp) {
     const bw = r * 2.2,
       bh = 3,
@@ -346,6 +356,73 @@ export function drawBoss(ctx: Ctx, boss: Boss, frame: number) {
     ctx.beginPath();
     ctx.arc(0, 0, r * 0.15, 0, Math.PI * 2);
     ctx.fill();
+  } else if (boss.type === 3) {
+    glow(ctx, "#00cc88", 34);
+    ctx.strokeStyle = "#00ffaa";
+    ctx.fillStyle = "#001a12";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+      const rad = i % 2 === 0 ? r : r * 0.75;
+      if (i === 0) ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      else ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.save();
+    ctx.rotate(frame * 0.015);
+    glow(ctx, "#00ffcc", 14);
+    ctx.strokeStyle = "#44ffdd";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.7, r * 0.45, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    glow(ctx, "#00dd99", 20);
+    ctx.fillStyle = "#00ffbb";
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (boss.type === 4) {
+    glow(ctx, "#ffdd00", 40);
+    ctx.strokeStyle = "#ffee44";
+    ctx.fillStyle = "#1a1a00";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const rad = r * (0.9 + Math.sin(a * 3) * 0.15);
+      if (i === 0) ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      else ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.save();
+    ctx.rotate(frame * 0.012);
+    glow(ctx, "#ffff88", 16);
+    ctx.strokeStyle = "#ffcc00";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.65, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.rotate(-frame * 0.02);
+    glow(ctx, "#ffffff", 10);
+    ctx.strokeStyle = "#ffeedd";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    glow(ctx, "#ffdd00", 24);
+    ctx.fillStyle = "#fff088";
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
   } else {
     glow(ctx, "#ff0044", 38);
     ctx.strokeStyle = "#ff2266";
@@ -401,6 +478,12 @@ export function drawBoss(ctx: Ctx, boss: Boss, frame: number) {
   } else if (boss.type === 1) {
     bgrad.addColorStop(0, "#6600cc");
     bgrad.addColorStop(1, "#ff44ff");
+  } else if (boss.type === 3) {
+    bgrad.addColorStop(0, "#006644");
+    bgrad.addColorStop(1, "#00ffaa");
+  } else if (boss.type === 4) {
+    bgrad.addColorStop(0, "#886600");
+    bgrad.addColorStop(1, "#ffdd00");
   } else {
     bgrad.addColorStop(0, "#aa0033");
     bgrad.addColorStop(1, "#ff4400");
@@ -454,6 +537,20 @@ export function drawEBullet(ctx: Ctx, b: EnemyBullet) {
   ctx.fillStyle = "#ff8844";
   ctx.beginPath();
   ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+  ctx.fill();
+  noGlow(ctx);
+}
+
+export function drawMissile(ctx: Ctx, m: Missile, frame: number) {
+  const flicker = 0.85 + Math.sin(frame * 0.4) * 0.15;
+  glow(ctx, "#ff6600", 14);
+  ctx.fillStyle = `rgba(255,140,40,${flicker})`;
+  ctx.beginPath();
+  ctx.arc(m.x, m.y, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,200,80,0.4)`;
+  ctx.beginPath();
+  ctx.arc(m.x, m.y, 9, 0, Math.PI * 2);
   ctx.fill();
   noGlow(ctx);
 }
@@ -518,6 +615,26 @@ export function drawDashCooldown(ctx: Ctx, cooldown: number, max: number, px: nu
   ctx.stroke();
 }
 
+export function drawMissileCooldown(ctx: Ctx, cooldown: number, max: number, px: number, py: number) {
+  if (max <= 0 || cooldown <= 0) return;
+  const pct = 1 - cooldown / max;
+  ctx.strokeStyle = "#ff6600";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(px - 28, py + 35, 12, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2);
+  ctx.stroke();
+}
+
+export function drawDodgeRollCooldown(ctx: Ctx, cooldown: number, max: number, px: number, py: number) {
+  if (max <= 0 || cooldown <= 0) return;
+  const pct = 1 - cooldown / max;
+  ctx.strokeStyle = "#88ff44";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(px + 28, py + 35, 12, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2);
+  ctx.stroke();
+}
+
 export function drawOverdriveMeter(ctx: Ctx, value: number, max: number) {
   const barW = 100;
   const barH = 6;
@@ -553,6 +670,166 @@ export function drawScreenFlash(ctx: Ctx, timer: number, max: number) {
   ctx.fillRect(0, 0, W, H);
 }
 
+export function drawBossHitFlash(ctx: Ctx, timer: number, max: number) {
+  if (timer <= 0) return;
+  const alpha = (timer / max) * 0.25;
+  ctx.fillStyle = `rgba(255,100,50,${alpha})`;
+  ctx.fillRect(0, 0, W, H);
+}
+
+export function drawDangerFlash(ctx: Ctx, timer: number, max: number) {
+  if (timer <= 0) return;
+  const alpha = (timer / max) * 0.5;
+  ctx.strokeStyle = `rgba(255,50,50,${alpha})`;
+  ctx.lineWidth = 8;
+  ctx.strokeRect(4, 4, W - 8, H - 8);
+}
+
+export function drawDashTrailSegments(
+  ctx: Ctx,
+  segments: { x: number; y: number; life: number; dmg: number }[],
+  maxLife: number
+) {
+  for (const s of segments) {
+    if (s.life <= 0) continue;
+    const alpha = (s.life / maxLife) * 0.5;
+    ctx.fillStyle = `rgba(0,255,136,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 12, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+export function drawDodgeRollGhosts(
+  ctx: Ctx,
+  ghosts: { x: number; y: number; life: number }[],
+  maxLife: number,
+  frame: number
+) {
+  for (const g of ghosts) {
+    if (g.life <= 0) continue;
+    const alpha = (g.life / maxLife) * 0.4;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(g.x, g.y);
+    ctx.strokeStyle = "#88ff44";
+    ctx.fillStyle = "rgba(0,40,20,0.5)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -14);
+    ctx.lineTo(8, 10);
+    ctx.lineTo(0, 6);
+    ctx.lineTo(-8, 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+export function drawThreatIndicator(ctx: Ctx, px: number, py: number, enemies: Enemy[], boss: Boss | null, colorBlind = false) {
+  const margin = 50;
+  for (const e of enemies) {
+    if (e.x >= margin && e.x <= W - margin && e.y >= margin && e.y <= H - margin) continue;
+    const dx = e.x - px;
+    const dy = e.y - py;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const edgeX = px + nx * Math.min(dist, 120);
+    const edgeY = py + ny * Math.min(dist, 120);
+    const ex = clamp(edgeX, 20, W - 20);
+    const ey = clamp(edgeY, 20, H - 20);
+    const r = e.elite ? 5 : 3;
+    if (colorBlind) {
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 1;
+      if (e.elite) {
+        ctx.beginPath();
+        ctx.moveTo(ex, ey - r);
+        ctx.lineTo(ex + r, ey + r);
+        ctx.lineTo(ex - r, ey + r);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.rect(ex - r, ey - r, r * 2, r * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = e.elite ? "rgba(255,200,0,0.8)" : "rgba(255,100,100,0.6)";
+      ctx.beginPath();
+      ctx.arc(ex, ey, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  if (boss && boss.phase !== "dead") {
+    const dx = boss.x - px;
+    const dy = boss.y - py;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const ex = clamp(px + nx * Math.min(dist, 150), 25, W - 25);
+    const ey = clamp(py + ny * Math.min(dist, 150), 25, H - 25);
+    if (colorBlind) {
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+        const x = ex + Math.cos(a) * 8;
+        const y = ey + Math.sin(a) * 8;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "rgba(255,50,50,0.9)";
+      ctx.beginPath();
+      ctx.arc(ex, ey, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#ff4444";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+}
+
+export function drawBossSuperTelegraph(ctx: Ctx, boss: Boss, timer: number) {
+  const pct = timer / BOSS_SUPER_TELEGRAPH_FRAMES;
+  const pulse = 0.3 + 0.4 * Math.sin(pct * Math.PI);
+  ctx.fillStyle = `rgba(255,0,80,${pulse * 0.4})`;
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = `rgba(255,100,150,${0.6 + pulse * 0.3})`;
+  ctx.lineWidth = 6;
+  ctx.strokeRect(20, 20, W - 40, H - 40);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 20px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("⚠ SUPER ATTACK ⚠", W / 2, H / 2 - 10);
+  ctx.fillText(`${Math.ceil(timer / 60 * 10) / 10}s`, W / 2, H / 2 + 12);
+}
+
+export function drawRunGoal(ctx: Ctx, current: number, target: number) {
+  if (target <= 0) return;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(12, H - 28, 100, 18);
+  ctx.strokeStyle = "#ffaa00";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(12, H - 28, 100, 18);
+  ctx.fillStyle = current >= target ? "#44ff44" : "#ffaa00";
+  ctx.font = "bold 10px 'Courier New', monospace";
+  ctx.textAlign = "left";
+  ctx.fillText(`ELITES ${current}/${target}`, 16, H - 15);
+  if (current >= target) ctx.fillText("✓ BONUS", 85, H - 15);
+}
+
 export function drawHUD(
   ctx: Ctx,
   p: Player,
@@ -564,7 +841,13 @@ export function drawHUD(
   dashCooldown?: number,
   dashCooldownMax?: number,
   overdriveMeter?: number,
-  overdriveMax?: number
+  overdriveMax?: number,
+  missileCooldown?: number,
+  missileCooldownMax?: number,
+  dodgeRollCooldown?: number,
+  dodgeRollCooldownMax?: number,
+  runGoalCurrent?: number,
+  runGoalTarget?: number
 ) {
   const barW = 170,
     barH = 13;
@@ -672,6 +955,12 @@ export function drawHUD(
   if (dashCooldown != null && dashCooldownMax != null && p) {
     drawDashCooldown(ctx, dashCooldown, dashCooldownMax, p.x, p.y);
   }
+  if (missileCooldown != null && missileCooldownMax != null && p) {
+    drawMissileCooldown(ctx, missileCooldown, missileCooldownMax, p.x, p.y);
+  }
+  if (dodgeRollCooldown != null && dodgeRollCooldownMax != null && p) {
+    drawDodgeRollCooldown(ctx, dodgeRollCooldown, dodgeRollCooldownMax, p.x, p.y);
+  }
 
   if (overdriveMeter != null && overdriveMax != null) {
     drawOverdriveMeter(ctx, overdriveMeter, overdriveMax);
@@ -684,6 +973,38 @@ export function drawHUD(
     ctx.textAlign = "left";
     ctx.fillText(`${sectorCfg.name} · ${sectorCfg.sub}`, 12, H - 10);
   }
+
+  if (runGoalTarget != null && runGoalTarget > 0 && runGoalCurrent != null) {
+    drawRunGoal(ctx, runGoalCurrent, runGoalTarget);
+  }
+}
+
+export function drawStatsPanel(
+  ctx: Ctx,
+  stats: { totalRuns: number; totalKills: number; bossesKilled: number; bestCombo: number; gamesWon: number; gamesLost: number; elitesKilled: number }
+) {
+  const x = 20,
+    y = 80,
+    lineH = 18;
+  ctx.fillStyle = "rgba(0,10,30,0.9)";
+  ctx.fillRect(x - 4, y - 4, 220, 10 * lineH + 8);
+  ctx.strokeStyle = "#00d4ff";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x - 4, y - 4, 220, 10 * lineH + 8);
+  ctx.fillStyle = "#00d4ff";
+  ctx.font = "bold 12px 'Courier New', monospace";
+  ctx.textAlign = "left";
+  ctx.fillText("STATS", x, y);
+  ctx.fillStyle = "#aaccff";
+  ctx.font = "11px 'Courier New', monospace";
+  let ly = y + lineH;
+  ctx.fillText(`Runs: ${stats.totalRuns}`, x, ly); ly += lineH;
+  ctx.fillText(`Kills: ${stats.totalKills}`, x, ly); ly += lineH;
+  ctx.fillText(`Bosses: ${stats.bossesKilled}`, x, ly); ly += lineH;
+  ctx.fillText(`Best combo: ${stats.bestCombo}`, x, ly); ly += lineH;
+  ctx.fillText(`Wins: ${stats.gamesWon}`, x, ly); ly += lineH;
+  ctx.fillText(`Losses: ${stats.gamesLost}`, x, ly); ly += lineH;
+  ctx.fillText(`Elites: ${stats.elitesKilled}`, x, ly);
 }
 
 export function drawCenterMessage(ctx: Ctx, msgTimer: number, msgStr: string) {
